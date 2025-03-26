@@ -19,8 +19,8 @@ public class CompanionDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
-        // Use case-insensitive collation for text columns
-        modelBuilder.UseCollation("und-x-icu");
+        // Use a collation compatible with the template database
+        // modelBuilder.UseCollation("und-x-icu");
 
         modelBuilder.Entity<Topology>(entity =>
         {
