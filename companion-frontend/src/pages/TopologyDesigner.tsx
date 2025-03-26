@@ -9,8 +9,9 @@ import { ExchangeNode } from '../components/topology/ExchangeNode';
 import { QueueNode } from '../components/topology/QueueNode';
 import { AddNodeDialog } from '../components/topology/AddNodeDialog';
 import { EditNodeDialog } from '../components/topology/EditNodeDialog';
+import { EditEdgeDialog } from '../components/topology/EditEdgeDialog';
 import { topologyApi } from '../services/api';
-import { NodeType, Topology, Exchange, Queue } from '../types/topology';
+import { NodeType, Topology, Exchange, Queue, Binding, ExchangeType } from '../types/topology';
 
 // Import ReactFlow styles
 import '@reactflow/core/dist/style.css';
@@ -35,10 +36,42 @@ export const TopologyDesigner: React.FC = () => {
         node: null,
         isOpen: false
     });
+    const [editEdge, setEditEdge] = useState<{ 
+        edge: Edge | null, 
+        sourceExchangeType: ExchangeType | undefined,
+        isOpen: boolean 
+    }>({
+        edge: null,
+        sourceExchangeType: undefined,
+        isOpen: false
+    });
 
     const onConnect = useCallback(
-        (params: Connection) => setEdges((eds) => addEdge(params, eds)),
-        [setEdges]
+        (params: Connection) => {
+            // Find the source node (exchange) to get its type
+            const sourceNode = nodes.find(n => n.id === params.source);
+            const sourceExchangeType = sourceNode?.data?.type as ExchangeType;
+
+            // Create a new edge with default binding data
+            const edge = {
+                ...params,
+                id: `e${params.source}-${params.target}`,
+                data: {
+                    routingKey: sourceExchangeType === ExchangeType.Direct ? 'route-key' : '',
+                },
+                label: sourceExchangeType === ExchangeType.Direct ? 'route-key' : '',
+            };
+
+            setEdges((eds) => addEdge(edge, eds));
+
+            // Open the edit dialog immediately for the new edge
+            setEditEdge({
+                edge: edge as Edge,
+                sourceExchangeType,
+                isOpen: true
+            });
+        },
+        [nodes, setEdges]
     );
 
     const handleAddNode = useCallback((type: NodeType, data: Partial<Exchange | Queue>) => {
@@ -131,6 +164,32 @@ export const TopologyDesigner: React.FC = () => {
         );
     }, [editNode.node, setNodes]);
 
+    const handleEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
+        // Find the source node (exchange) to get its type
+        const sourceNode = nodes.find(n => n.id === edge.source);
+        const sourceExchangeType = sourceNode?.data?.type as ExchangeType;
+
+        setEditEdge({ 
+            edge, 
+            sourceExchangeType,
+            isOpen: true 
+        });
+    }, [nodes]);
+
+    const handleUpdateEdge = useCallback((edge: Edge, data: Partial<Binding>) => {
+        setEdges((eds) =>
+            eds.map((e) =>
+                e.id === edge.id
+                    ? { 
+                        ...e, 
+                        data: { ...e.data, ...data },
+                        label: data.routingKey || e.label 
+                    }
+                    : e
+            )
+        );
+    }, [setEdges]);
+
     return (
         <Box sx={{ height: 'calc(100vh - 128px)', position: 'relative' }}>
             <Paper 
@@ -151,6 +210,7 @@ export const TopologyDesigner: React.FC = () => {
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
                     onNodeDoubleClick={handleNodeDoubleClick}
+                    onEdgeDoubleClick={handleEdgeDoubleClick}
                     nodeTypes={NODE_TYPES}
                     defaultViewport={INITIAL_VIEWPORT}
                     minZoom={0.1}
@@ -197,6 +257,14 @@ export const TopologyDesigner: React.FC = () => {
                 onSave={handleUpdateNode}
                 nodeType={editNode.node?.type as NodeType}
                 initialData={editNode.node?.data}
+            />
+
+            <EditEdgeDialog
+                open={editEdge.isOpen}
+                onClose={() => setEditEdge({ edge: null, sourceExchangeType: undefined, isOpen: false })}
+                onSave={handleUpdateEdge}
+                edge={editEdge.edge}
+                sourceExchangeType={editEdge.sourceExchangeType}
             />
 
             <Snackbar
