@@ -1,5 +1,5 @@
 import React from 'react';
-import { AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography } from '@mui/material';
+import { AppBar, Box, CssBaseline, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, Toolbar, Typography } from '@mui/material';
 import { Menu as MenuIcon, AccountTree as TopologyIcon, PlayArrow as SimulationIcon, BugReport as DebugIcon, School as LearningIcon } from '@mui/icons-material';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -21,16 +21,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <Toolbar />
             <List>
                 {menuItems.map((item) => (
-                    <ListItem key={item.text} disablePadding>
-                        <ListItemButton
-                            component={Link}
-                            to={item.path}
-                            selected={location.pathname === item.path}
-                        >
-                            <ListItemIcon>{item.icon}</ListItemIcon>
-                            <ListItemText primary={item.text} />
-                        </ListItemButton>
-                    </ListItem>
+                    <ListItemButton
+                        key={item.text}
+                        component={Link}
+                        to={item.path}
+                        selected={location.pathname === item.path}
+                    >
+                        <ListItemIcon>{item.icon}</ListItemIcon>
+                        <ListItemText primary={item.text} />
+                    </ListItemButton>
                 ))}
             </List>
         </div>
