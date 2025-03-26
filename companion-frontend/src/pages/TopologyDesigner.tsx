@@ -4,7 +4,7 @@ import { Background } from '@reactflow/background';
 import { Controls } from '@reactflow/controls';
 import { MiniMap } from '@reactflow/minimap';
 import { Box, Paper, Alert, Snackbar, Fab, Tooltip } from '@mui/material';
-import { Add as AddIcon, CloudDownload as CloudDownloadIcon } from '@mui/icons-material';
+import { Add as AddIcon, CloudDownload as CloudDownloadIcon, Storage as StorageIcon, ImportExport as ImportExportIcon } from '@mui/icons-material';
 import { ExchangeNode } from '../components/topology/ExchangeNode';
 import { QueueNode } from '../components/topology/QueueNode';
 import { AddNodeDialog } from '../components/topology/AddNodeDialog';
@@ -21,6 +21,13 @@ import {
     restoreLayout, 
     LayoutOptions 
 } from '../utils/layoutManagement';
+import { ExportImportDialog } from '../components/topology/ExportImportDialog';
+import { 
+    downloadTopologyAsJson, 
+    convertFlowToTopology, 
+    convertTopologyToFlow 
+} from '../utils/topologyConverter';
+import { ConfigurationOptions } from '../services/api';
 
 // Import ReactFlow styles
 import '@reactflow/core/dist/style.css';
@@ -142,6 +149,7 @@ export const TopologyDesigner: React.FC = () => {
     const [currentTopologyId, setCurrentTopologyId] = useState<string>('default');
     const reactFlowInstance = useReactFlow();
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [isExportImportDialogOpen, setIsExportImportDialogOpen] = useState(false);
 
     // Get source exchange type for an edge
     const getSourceExchangeType = useCallback((sourceId: string): ExchangeType | undefined => {
@@ -211,54 +219,14 @@ export const TopologyDesigner: React.FC = () => {
             
             setNodes(nodes);
             setEdges(edges);
+            setSuccessMessage('Topology loaded from broker successfully');
         } catch (err) {
             setError('Failed to load topology from broker');
             console.error('Error loading topology:', err);
         } finally {
             setIsLoading(false);
         }
-    }, [setNodes, setEdges]);
-
-    const convertTopologyToFlow = useCallback((topology: Topology) => {
-        const nodes: Node[] = [];
-        const edges: Edge[] = [];
-        
-        let exchangeY = 50;
-        let queueY = 50;
-        
-        topology.exchanges.forEach((exchange) => {
-            nodes.push({
-                id: exchange.id,
-                type: NodeType.Exchange,
-                position: { x: 100, y: exchangeY },
-                data: exchange,
-            });
-            exchangeY += 150;
-        });
-
-        topology.queues.forEach((queue) => {
-            nodes.push({
-                id: queue.id,
-                type: NodeType.Queue,
-                position: { x: 500, y: queueY },
-                data: queue,
-            });
-            queueY += 150;
-        });
-
-        topology.bindings.forEach((binding) => {
-            edges.push({
-                id: binding.id,
-                source: binding.sourceExchange,
-                target: binding.destinationQueue,
-                data: binding,
-                label: binding.routingKey,
-                type: 'smoothstep',
-            });
-        });
-
-        return { nodes, edges };
-    }, []);
+    }, [setNodes, setEdges, setSuccessMessage, setError]);
 
     const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
         setEditNode({ node, isOpen: true });
@@ -355,6 +323,34 @@ export const TopologyDesigner: React.FC = () => {
         }
     }, [onNodesChange, isSnapToGridEnabled, setNodes]);
 
+    // Handle export/import
+    const handleOpenExportImportDialog = useCallback(() => {
+        setIsExportImportDialogOpen(true);
+    }, []);
+
+    const handleCloseExportImportDialog = useCallback(() => {
+        setIsExportImportDialogOpen(false);
+    }, []);
+
+    const handleImportTopology = useCallback((importedTopology: Topology) => {
+        try {
+            const { nodes: importedNodes, edges: importedEdges } = convertTopologyToFlow(importedTopology);
+            setNodes(importedNodes);
+            setEdges(importedEdges);
+            setSuccessMessage('Topology imported successfully');
+        } catch (err) {
+            setError('Failed to import topology: ' + (err instanceof Error ? err.message : 'Unknown error'));
+        }
+    }, [setNodes, setEdges, setSuccessMessage, setError]);
+
+    const handleGenerateConfiguration = useCallback(
+        async (options: ConfigurationOptions) => {
+            const currentTopology = convertFlowToTopology(nodes, edges);
+            return await topologyApi.generateConfiguration(currentTopology, options);
+        },
+        [nodes, edges]
+    );
+
     return (
         <Box sx={{ height: 'calc(100vh - 64px)', width: '100%', position: 'relative' }}>
             <LayoutControls
@@ -403,6 +399,15 @@ export const TopologyDesigner: React.FC = () => {
             </Paper>
 
             <Box sx={{ position: 'absolute', bottom: 16, right: 16 }}>
+                <Tooltip title="Export/Import">
+                    <Fab
+                        color="primary"
+                        onClick={handleOpenExportImportDialog}
+                        sx={{ mr: 1 }}
+                    >
+                        <ImportExportIcon />
+                    </Fab>
+                </Tooltip>
                 <Tooltip title="Load from Broker">
                     <Fab
                         color="primary"
@@ -443,6 +448,14 @@ export const TopologyDesigner: React.FC = () => {
                 onSave={handleUpdateEdge}
                 edge={editEdge.edge}
                 sourceExchangeType={editEdge.sourceExchangeType}
+            />
+
+            <ExportImportDialog
+                open={isExportImportDialogOpen}
+                onClose={handleCloseExportImportDialog}
+                topology={convertFlowToTopology(nodes, edges)}
+                onImportTopology={handleImportTopology}
+                onGenerateConfiguration={handleGenerateConfiguration}
             />
 
             <Snackbar

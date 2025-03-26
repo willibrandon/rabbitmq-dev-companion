@@ -10,6 +10,22 @@ const api = axios.create({
     },
 });
 
+export interface ConfigurationOptions {
+    includeDotNetCode?: boolean;
+    includeDockerCompose?: boolean;
+    includeKubernetes?: boolean;
+    includeProducerCode?: boolean;
+    includeConsumerCode?: boolean;
+}
+
+export interface ConfigurationOutput {
+    dotNetCode?: string;
+    dockerComposeYaml?: string;
+    kubernetesYaml?: string;
+    producerCode?: string;
+    consumerCode?: string;
+}
+
 export const topologyApi = {
     getFromBroker: async (): Promise<Topology> => {
         const response = await api.get<Topology>('/topologies/from-broker');
@@ -33,6 +49,19 @@ export const topologyApi = {
         } catch {
             return false;
         }
+    },
+
+    saveTopology: async (topology: Topology): Promise<Topology> => {
+        const response = await api.post<Topology>('/topologies', topology);
+        return response.data;
+    },
+
+    generateConfiguration: async (topology: Topology, options: ConfigurationOptions): Promise<ConfigurationOutput> => {
+        const response = await api.post<ConfigurationOutput>('/config-generator', { 
+            topology, 
+            options 
+        });
+        return response.data;
     }
 };
 
