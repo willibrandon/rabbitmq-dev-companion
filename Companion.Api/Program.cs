@@ -6,6 +6,7 @@ using Companion.Infrastructure.RabbitMq;
 using Companion.Simulator.Hubs;
 using Companion.Simulator.Services;
 using Companion.Patterns.Services;
+using Companion.Learning.Services;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using RabbitMQ.Client;
@@ -46,6 +47,7 @@ builder.Services.AddScoped<ITopologyService, TopologyService>();
 builder.Services.AddScoped<ITopologyRepository, TopologyRepository>();
 builder.Services.AddScoped<IMessageFlowService, MessageFlowService>();
 builder.Services.AddScoped<IPatternAnalysisService, PatternAnalysisService>();
+builder.Services.AddScoped<ILearningService, LearningService>();
 
 // Add SignalR
 builder.Services.AddSignalR();
