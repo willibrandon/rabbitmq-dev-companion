@@ -11,6 +11,7 @@ import { AddNodeDialog } from '../components/topology/AddNodeDialog';
 import { EditNodeDialog } from '../components/topology/EditNodeDialog';
 import { EditEdgeDialog } from '../components/topology/EditEdgeDialog';
 import { LayoutControls } from '../components/topology/LayoutControls';
+import { HistoryControls } from '../components/topology/HistoryControls';
 import { getEdgeStyle } from '../components/topology/EdgeStyles';
 import { topologyApi } from '../services/api';
 import { NodeType, Topology, Exchange, Queue, Binding, ExchangeType } from '../types/topology';
@@ -21,6 +22,7 @@ import {
     restoreLayout, 
     LayoutOptions 
 } from '../utils/layoutManagement';
+import { historyManager, TopologyDraft, TopologySnapshot } from '../utils/historyManager';
 import { ExportImportDialog } from '../components/topology/ExportImportDialog';
 import { 
     downloadTopologyAsJson, 
@@ -150,6 +152,172 @@ export const TopologyDesigner: React.FC = () => {
     const reactFlowInstance = useReactFlow();
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [isExportImportDialogOpen, setIsExportImportDialogOpen] = useState(false);
+    
+    // History management state
+    const [canUndo, setCanUndo] = useState(false);
+    const [canRedo, setCanRedo] = useState(false);
+    const [drafts, setDrafts] = useState<TopologyDraft[]>([]);
+    const isInitialRender = useRef(true);
+    const skipNextHistoryUpdate = useRef(false);
+    const currentHistoryIndex = useRef(-1);
+
+    // Update drafts whenever they change
+    useEffect(() => {
+        const loadDrafts = () => {
+            setDrafts(historyManager.getDrafts());
+        };
+        
+        loadDrafts();
+        
+        // Listen for draft changes (e.g., from another tab)
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'topology-drafts') {
+                loadDrafts();
+            }
+        });
+        
+        return () => {
+            window.removeEventListener('storage', () => {});
+        };
+    }, []);
+
+    // Initialize history on first render
+    useEffect(() => {
+        if (isInitialRender.current && nodes.length > 0) {
+            const snapshot = historyManager.createSnapshot(nodes, edges);
+            historyManager.addToHistory(snapshot);
+            setCanUndo(historyManager.canUndo());
+            setCanRedo(historyManager.canRedo());
+            isInitialRender.current = false;
+        }
+    }, [nodes, edges]);
+
+    // Update history when nodes or edges change
+    useEffect(() => {
+        if (!isInitialRender.current && !skipNextHistoryUpdate.current) {
+            const snapshot = historyManager.createSnapshot(nodes, edges);
+            historyManager.addToHistory(snapshot);
+            currentHistoryIndex.current = historyManager.getCurrentIndex();
+            setCanUndo(historyManager.canUndo());
+            setCanRedo(historyManager.canRedo());
+        }
+        skipNextHistoryUpdate.current = false;
+    }, [nodes, edges]);
+
+    // Handle undo action
+    const handleUndo = useCallback(() => {
+        const snapshot = historyManager.undo();
+        if (snapshot) {
+            skipNextHistoryUpdate.current = true;
+            setNodes(snapshot.nodes);
+            setEdges(snapshot.edges);
+            
+            // Update current index ref and state flags
+            currentHistoryIndex.current = historyManager.getCurrentIndex();
+            setCanUndo(historyManager.canUndo());
+            setCanRedo(historyManager.canRedo());
+        }
+    }, [setNodes, setEdges]);
+
+    // Handle redo action
+    const handleRedo = useCallback(() => {
+        const snapshot = historyManager.redo();
+        if (snapshot) {
+            skipNextHistoryUpdate.current = true;
+            setNodes(snapshot.nodes);
+            setEdges(snapshot.edges);
+            
+            // Update current index ref and state flags
+            currentHistoryIndex.current = historyManager.getCurrentIndex();
+            setCanUndo(historyManager.canUndo());
+            setCanRedo(historyManager.canRedo());
+        }
+    }, [setNodes, setEdges]);
+
+    // Jump to a specific history state
+    const handleJumpToState = useCallback((index: number) => {
+        skipNextHistoryUpdate.current = true;
+        
+        // Get history from historyManager
+        const targetSnapshot = historyManager.getHistoryAt(index);
+        if (targetSnapshot) {
+            setNodes(targetSnapshot.nodes);
+            setEdges(targetSnapshot.edges);
+            
+            // Update history index
+            historyManager.setCurrentIndex(index);
+            currentHistoryIndex.current = index;
+            setCanUndo(historyManager.canUndo());
+            setCanRedo(historyManager.canRedo());
+            
+            setSuccessMessage('Jumped to previous state');
+        }
+    }, [setNodes, setEdges]);
+
+    // Add keyboard shortcuts for undo/redo
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            // Check for Ctrl+Z or Cmd+Z (Undo)
+            if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
+                event.preventDefault();
+                if (canUndo) {
+                    handleUndo();
+                }
+            }
+            
+            // Check for Ctrl+Y or Cmd+Y or Ctrl+Shift+Z (Redo)
+            if (((event.ctrlKey || event.metaKey) && event.key === 'y') || 
+                ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'z')) {
+                event.preventDefault();
+                if (canRedo) {
+                    handleRedo();
+                }
+            }
+        };
+        
+        document.addEventListener('keydown', handleKeyDown);
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+        };
+    }, [canUndo, canRedo, handleUndo, handleRedo]);
+
+    // Handle save draft
+    const handleSaveDraft = useCallback((name: string) => {
+        const snapshot = historyManager.createSnapshot(nodes, edges);
+        const draftId = `draft-${Date.now()}`;
+        historyManager.saveDraft(draftId, name, snapshot);
+        setDrafts(historyManager.getDrafts());
+        setSuccessMessage(`Draft "${name}" saved successfully`);
+    }, [nodes, edges]);
+
+    // Handle load draft
+    const handleLoadDraft = useCallback((draftId: string) => {
+        const draft = historyManager.getDraft(draftId);
+        if (draft) {
+            setNodes(draft.snapshot.nodes);
+            setEdges(draft.snapshot.edges);
+            setSuccessMessage(`Draft "${draft.name}" loaded successfully`);
+            
+            // Add the loaded draft to the history
+            const snapshot = historyManager.createSnapshot(
+                draft.snapshot.nodes, 
+                draft.snapshot.edges
+            );
+            historyManager.addToHistory(snapshot);
+            setCanUndo(historyManager.canUndo());
+            setCanRedo(historyManager.canRedo());
+        }
+    }, [setNodes, setEdges]);
+
+    // Handle delete draft
+    const handleDeleteDraft = useCallback((draftId: string) => {
+        const draft = historyManager.getDraft(draftId);
+        if (draft) {
+            historyManager.deleteDraft(draftId);
+            setDrafts(historyManager.getDrafts());
+            setSuccessMessage(`Draft "${draft.name}" deleted`);
+        }
+    }, []);
 
     // Get source exchange type for an edge
     const getSourceExchangeType = useCallback((sourceId: string): ExchangeType | undefined => {
@@ -361,6 +529,21 @@ export const TopologyDesigner: React.FC = () => {
                 onUpdateLayoutOptions={handleUpdateLayoutOptions}
                 isSnapToGridEnabled={isSnapToGridEnabled}
                 layoutOptions={layoutOptions}
+            />
+
+            {/* Add History Controls */}
+            <HistoryControls 
+                canUndo={canUndo}
+                canRedo={canRedo}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onSaveDraft={handleSaveDraft}
+                onLoadDraft={handleLoadDraft}
+                onDeleteDraft={handleDeleteDraft}
+                onJumpToState={handleJumpToState}
+                drafts={drafts}
+                history={historyManager.getHistory()}
+                currentHistoryIndex={historyManager.getCurrentIndex()}
             />
 
             <Paper 
