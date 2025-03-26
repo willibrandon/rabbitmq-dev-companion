@@ -8,6 +8,7 @@ import { Add as AddIcon, CloudDownload as CloudDownloadIcon } from '@mui/icons-m
 import { ExchangeNode } from '../components/topology/ExchangeNode';
 import { QueueNode } from '../components/topology/QueueNode';
 import { AddNodeDialog } from '../components/topology/AddNodeDialog';
+import { EditNodeDialog } from '../components/topology/EditNodeDialog';
 import { topologyApi } from '../services/api';
 import { NodeType, Topology, Exchange, Queue } from '../types/topology';
 
@@ -30,6 +31,10 @@ export const TopologyDesigner: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isAddNodeDialogOpen, setIsAddNodeDialogOpen] = useState(false);
+    const [editNode, setEditNode] = useState<{ node: Node | null, isOpen: boolean }>({
+        node: null,
+        isOpen: false
+    });
 
     const onConnect = useCallback(
         (params: Connection) => setEdges((eds) => addEdge(params, eds)),
@@ -110,6 +115,22 @@ export const TopologyDesigner: React.FC = () => {
         return { nodes, edges };
     }, []);
 
+    const handleNodeDoubleClick = useCallback((event: React.MouseEvent, node: Node) => {
+        setEditNode({ node, isOpen: true });
+    }, []);
+
+    const handleUpdateNode = useCallback((type: NodeType, data: Partial<Exchange | Queue>) => {
+        if (!editNode.node) return;
+
+        setNodes((nds) =>
+            nds.map((node) =>
+                node.id === editNode.node?.id
+                    ? { ...node, data: { ...node.data, ...data } }
+                    : node
+            )
+        );
+    }, [editNode.node, setNodes]);
+
     return (
         <Box sx={{ height: 'calc(100vh - 128px)', position: 'relative' }}>
             <Paper 
@@ -129,6 +150,7 @@ export const TopologyDesigner: React.FC = () => {
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
+                    onNodeDoubleClick={handleNodeDoubleClick}
                     nodeTypes={NODE_TYPES}
                     defaultViewport={INITIAL_VIEWPORT}
                     minZoom={0.1}
@@ -167,6 +189,14 @@ export const TopologyDesigner: React.FC = () => {
                 open={isAddNodeDialogOpen}
                 onClose={() => setIsAddNodeDialogOpen(false)}
                 onAdd={handleAddNode}
+            />
+
+            <EditNodeDialog
+                open={editNode.isOpen}
+                onClose={() => setEditNode({ node: null, isOpen: false })}
+                onSave={handleUpdateNode}
+                nodeType={editNode.node?.type as NodeType}
+                initialData={editNode.node?.data}
             />
 
             <Snackbar
