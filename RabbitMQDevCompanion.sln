@@ -17,6 +17,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Companion.Patterns", "Compa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Companion.Tests", "Companion.Tests\Companion.Tests.csproj", "{854B4E0F-A628-4167-872B-8F5E759562CF}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Companion.Infrastructure", "Companion.Infrastructure\Companion.Infrastructure.csproj", "{C618D513-D14F-4C00-810A-1E06CC962936}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -54,5 +56,9 @@ Global
 		{854B4E0F-A628-4167-872B-8F5E759562CF}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{854B4E0F-A628-4167-872B-8F5E759562CF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{854B4E0F-A628-4167-872B-8F5E759562CF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C618D513-D14F-4C00-810A-1E06CC962936}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C618D513-D14F-4C00-810A-1E06CC962936}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C618D513-D14F-4C00-810A-1E06CC962936}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C618D513-D14F-4C00-810A-1E06CC962936}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

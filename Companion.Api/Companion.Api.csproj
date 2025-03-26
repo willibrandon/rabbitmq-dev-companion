@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.0.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,6 +17,7 @@
     <ProjectReference Include="..\Companion.Debug\Companion.Debug.csproj" />
     <ProjectReference Include="..\Companion.Learning\Companion.Learning.csproj" />
     <ProjectReference Include="..\Companion.Patterns\Companion.Patterns.csproj" />
+    <ProjectReference Include="..\Companion.Infrastructure\Companion.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
