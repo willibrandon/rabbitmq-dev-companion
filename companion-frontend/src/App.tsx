@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, createTheme } from '@mui/material';
 import { Layout } from './components/Layout';
-import { TopologyDesigner } from './pages/TopologyDesigner';
+import TopologyDesigner from './pages/TopologyDesigner';
 import { Simulations } from './pages/Simulations';
 import { DebugAnalysis } from './pages/DebugAnalysis';
 import { LearningModules } from './pages/LearningModules';

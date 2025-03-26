@@ -1,5 +1,5 @@
-import React, { useCallback, useState, useMemo } from 'react';
-import { ReactFlow, Node, Edge, Connection, useNodesState, useEdgesState, addEdge } from '@reactflow/core';
+import React, { useCallback, useState, useMemo, useEffect, useRef } from 'react';
+import { ReactFlow, Node, Edge, Connection, useNodesState, useEdgesState, addEdge, useReactFlow, ReactFlowProvider } from '@reactflow/core';
 import { Background } from '@reactflow/background';
 import { Controls } from '@reactflow/controls';
 import { MiniMap } from '@reactflow/minimap';
@@ -10,9 +10,17 @@ import { QueueNode } from '../components/topology/QueueNode';
 import { AddNodeDialog } from '../components/topology/AddNodeDialog';
 import { EditNodeDialog } from '../components/topology/EditNodeDialog';
 import { EditEdgeDialog } from '../components/topology/EditEdgeDialog';
+import { LayoutControls } from '../components/topology/LayoutControls';
 import { getEdgeStyle } from '../components/topology/EdgeStyles';
 import { topologyApi } from '../services/api';
 import { NodeType, Topology, Exchange, Queue, Binding, ExchangeType } from '../types/topology';
+import { 
+    getAutoLayout, 
+    snapToGrid, 
+    saveLayout, 
+    restoreLayout, 
+    LayoutOptions 
+} from '../utils/layoutManagement';
 
 // Import ReactFlow styles
 import '@reactflow/core/dist/style.css';
@@ -125,6 +133,15 @@ export const TopologyDesigner: React.FC = () => {
         sourceExchangeType: undefined,
         isOpen: false
     });
+    const [isSnapToGridEnabled, setIsSnapToGridEnabled] = useState(false);
+    const [layoutOptions, setLayoutOptions] = useState<LayoutOptions>({
+        direction: 'LR',
+        nodeSeparation: 100,
+        rankSeparation: 200,
+    });
+    const [currentTopologyId, setCurrentTopologyId] = useState<string>('default');
+    const reactFlowInstance = useReactFlow();
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     // Get source exchange type for an edge
     const getSourceExchangeType = useCallback((sourceId: string): ExchangeType | undefined => {
@@ -282,8 +299,74 @@ export const TopologyDesigner: React.FC = () => {
         );
     }, [setEdges]);
 
+    // Apply auto-layout to nodes
+    const handleAutoLayout = useCallback(() => {
+        const layoutedNodes = getAutoLayout(nodes, edges, layoutOptions);
+        setNodes(layoutedNodes);
+    }, [nodes, edges, layoutOptions, setNodes]);
+
+    // Toggle snap-to-grid
+    const handleToggleSnapToGrid = useCallback((enabled: boolean) => {
+        setIsSnapToGridEnabled(enabled);
+        if (enabled) {
+            const snappedNodes = snapToGrid(nodes);
+            setNodes(snappedNodes);
+        }
+    }, [nodes, setNodes]);
+
+    // Save current layout
+    const handleSaveLayout = useCallback(() => {
+        if (reactFlowInstance) {
+            const { zoom, x, y } = reactFlowInstance.getViewport();
+            saveLayout(nodes, currentTopologyId, { zoom, position: { x, y } });
+            setSuccessMessage('Layout saved successfully');
+        } else {
+            saveLayout(nodes, currentTopologyId);
+            setSuccessMessage('Layout saved successfully');
+        }
+    }, [nodes, currentTopologyId, reactFlowInstance]);
+
+    // Restore saved layout
+    const handleRestoreLayout = useCallback(() => {
+        const result = restoreLayout(nodes, currentTopologyId);
+        setNodes(result.nodes);
+        
+        // Also restore viewport if available
+        if (result.viewportState && reactFlowInstance) {
+            const { zoom, position } = result.viewportState;
+            reactFlowInstance.setViewport({ zoom, x: position.x, y: position.y });
+        }
+    }, [nodes, currentTopologyId, setNodes, reactFlowInstance]);
+
+    // Update layout options
+    const handleUpdateLayoutOptions = useCallback((options: LayoutOptions) => {
+        setLayoutOptions(options);
+    }, []);
+
+    // Snap nodes to grid on node change if enabled
+    const onNodesChangeWithSnap = useCallback((changes: any) => {
+        onNodesChange(changes);
+        
+        if (isSnapToGridEnabled) {
+            // Use setTimeout to ensure the changes have been applied
+            setTimeout(() => {
+                setNodes((currentNodes) => snapToGrid(currentNodes));
+            }, 0);
+        }
+    }, [onNodesChange, isSnapToGridEnabled, setNodes]);
+
     return (
-        <Box sx={{ height: 'calc(100vh - 128px)', position: 'relative' }}>
+        <Box sx={{ height: 'calc(100vh - 64px)', width: '100%', position: 'relative' }}>
+            <LayoutControls
+                onAutoLayout={handleAutoLayout}
+                onToggleSnapToGrid={handleToggleSnapToGrid}
+                onSaveLayout={handleSaveLayout}
+                onRestoreLayout={handleRestoreLayout}
+                onUpdateLayoutOptions={handleUpdateLayoutOptions}
+                isSnapToGridEnabled={isSnapToGridEnabled}
+                layoutOptions={layoutOptions}
+            />
+
             <Paper 
                 elevation={3} 
                 sx={{ 
@@ -298,7 +381,7 @@ export const TopologyDesigner: React.FC = () => {
                 <ReactFlow
                     nodes={nodes}
                     edges={styledEdges}
-                    onNodesChange={onNodesChange}
+                    onNodesChange={isSnapToGridEnabled ? onNodesChangeWithSnap : onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}
                     onNodeDoubleClick={handleNodeDoubleClick}
@@ -310,10 +393,12 @@ export const TopologyDesigner: React.FC = () => {
                     maxZoom={4}
                     fitView
                     attributionPosition="bottom-left"
+                    snapToGrid={isSnapToGridEnabled}
+                    snapGrid={[20, 20]}
                 >
-                    <Background color="#aaa" gap={16} />
                     <Controls />
                     <MiniMap />
+                    <Background color="#aaa" gap={20} />
                 </ReactFlow>
             </Paper>
 
@@ -361,6 +446,17 @@ export const TopologyDesigner: React.FC = () => {
             />
 
             <Snackbar
+                open={!!successMessage}
+                autoHideDuration={2000}
+                onClose={() => setSuccessMessage(null)}
+                anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            >
+                <Alert severity="success" onClose={() => setSuccessMessage(null)}>
+                    {successMessage}
+                </Alert>
+            </Snackbar>
+
+            <Snackbar
                 open={!!error}
                 autoHideDuration={6000}
                 onClose={() => setError(null)}
@@ -371,4 +467,13 @@ export const TopologyDesigner: React.FC = () => {
             </Snackbar>
         </Box>
     );
-}; 
+};
+
+// Wrap the component with ReactFlowProvider
+export default function WrappedTopologyDesigner() {
+    return (
+        <ReactFlowProvider>
+            <TopologyDesigner />
+        </ReactFlowProvider>
+    );
+} 
