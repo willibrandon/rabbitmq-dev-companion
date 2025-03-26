@@ -25,6 +25,7 @@ export interface Queue {
     exclusive: boolean;
     arguments?: Record<string, any>;
     maxLength?: number;
+    maxLengthBytes?: number;
     messageTtl?: number;
     deadLetterExchange?: string;
     deadLetterRoutingKey?: string;
