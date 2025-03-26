@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq-credentials
+type: Opaque
+data:
+  username: {{ options.username | string.to_base64 }}
+  password: {{ options.password | string.to_base64 }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rabbitmq-config
+data:
+  definitions.json: |
+    {
+      "rabbit_version": "3.11",
+      "users": [
+        {
+          "name": "{{ options.username }}",
+          "password_hash": "{{ options.password }}",
+          "tags": "administrator"
+        }
+      ],
+      "vhosts": [
+        {
+          "name": "{{ options.virtualhost }}"
+        }
+      ],
+      "permissions": [
+        {
+          "user": "{{ options.username }}",
+          "vhost": "{{ options.virtualhost }}",
+          "configure": ".*",
+          "write": ".*",
+          "read": ".*"
+        }
+      ],
+      "exchanges": [
+        {{~ for exchange in topology.exchanges ~}}
+        {
+          "name": "{{ exchange.name }}",
+          "vhost": "{{ options.virtualhost }}",
+          "type": "{{ exchange.type | string.downcase }}",
+          "durable": {{ exchange.durable | string.downcase }},
+          "auto_delete": {{ exchange.autodelete | string.downcase }},
+          "internal": {{ exchange.internal | string.downcase }},
+          "arguments": {{ exchange.arguments | object.to_json }}
+        }{{ if !for.last }},{{ end }}
+        {{~ end ~}}
+      ],
+      "queues": [
+        {{~ for queue in topology.queues ~}}
+        {
+          "name": "{{ queue.name }}",
+          "vhost": "{{ options.virtualhost }}",
+          "durable": {{ queue.durable | string.downcase }},
+          "auto_delete": {{ queue.autodelete | string.downcase }},
+          "arguments": {{ queue.arguments | object.to_json }}
+        }{{ if !for.last }},{{ end }}
+        {{~ end ~}}
+      ],
+      "bindings": [
+        {{~ for binding in topology.bindings ~}}
+        {
+          "source": "{{ binding.sourceexchange }}",
+          "vhost": "{{ options.virtualhost }}",
+          "destination": "{{ binding.destinationqueue }}",
+          "destination_type": "queue",
+          "routing_key": "{{ binding.routingkey }}",
+          "arguments": {{ binding.arguments | object.to_json }}
+        }{{ if !for.last }},{{ end }}
+        {{~ end ~}}
+      ]
+    }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: rabbitmq
+spec:
+  serviceName: rabbitmq
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+      - name: rabbitmq
+        image: rabbitmq:3.11-management
+        ports:
+        - containerPort: 5672
+          name: amqp
+        - containerPort: 15672
+          name: management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-credentials
+              key: username
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-credentials
+              key: password
+        - name: RABBITMQ_DEFAULT_VHOST
+          value: {{ options.virtualhost }}
+        volumeMounts:
+        - name: rabbitmq-data
+          mountPath: /var/lib/rabbitmq
+        - name: rabbitmq-config
+          mountPath: /etc/rabbitmq/definitions.json
+          subPath: definitions.json
+        readinessProbe:
+          exec:
+            command: ["rabbitmq-diagnostics", "check_port_connectivity"]
+          initialDelaySeconds: 20
+          periodSeconds: 30
+          timeoutSeconds: 10
+      volumes:
+      - name: rabbitmq-config
+        configMap:
+          name: rabbitmq-config
+  volumeClaimTemplates:
+  - metadata:
+      name: rabbitmq-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+  - port: 5672
+    name: amqp
+  - port: 15672
+    name: management 

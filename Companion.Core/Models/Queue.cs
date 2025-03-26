@@ -8,6 +8,11 @@ namespace Companion.Core.Models;
 public class Queue
 {
     /// <summary>
+    /// Gets or sets the unique identifier for the queue
+    /// </summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    /// <summary>
     /// Gets or sets the unique name of the queue
     /// </summary>
     public string Name { get; set; } = string.Empty;

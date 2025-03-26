@@ -1,15 +1,19 @@
 using Companion.Core.Models;
+using Companion.Core.Repositories;
 using Companion.Core.Services;
+using Moq;
 
 namespace Companion.Tests.Services;
 
 public class TopologyServiceTests
 {
-    private readonly ITopologyService _service;
+    private readonly Mock<ITopologyRepository> _mockRepository;
+    private readonly TopologyService _service;
 
     public TopologyServiceTests()
     {
-        _service = new TopologyService();
+        _mockRepository = new Mock<ITopologyRepository>();
+        _service = new TopologyService(_mockRepository.Object);
     }
 
     [Fact]
@@ -21,15 +25,15 @@ public class TopologyServiceTests
             Name = "Test Topology",
             Exchanges = new List<Exchange>
             {
-                new() { Name = "test.exchange", Type = ExchangeType.Direct }
+                new Exchange { Name = "test.exchange", Type = ExchangeType.Direct }
             },
             Queues = new List<Queue>
             {
-                new() { Name = "test.queue" }
+                new Queue { Name = "test.queue" }
             },
             Bindings = new List<Binding>
             {
-                new()
+                new Binding
                 {
                     SourceExchange = "test.exchange",
                     DestinationQueue = "test.queue",
@@ -69,7 +73,7 @@ public class TopologyServiceTests
             Name = "Test",
             Exchanges = new List<Exchange>
             {
-                new() { Name = "invalid/exchange", Type = ExchangeType.Direct }
+                new Exchange { Name = "invalid/exchange", Type = ExchangeType.Direct }
             }
         };
 
@@ -90,15 +94,15 @@ public class TopologyServiceTests
             Name = "Test",
             Exchanges = new List<Exchange>
             {
-                new() { Name = "test.fanout", Type = ExchangeType.Fanout }
+                new Exchange { Name = "test.fanout", Type = ExchangeType.Fanout }
             },
             Queues = new List<Queue>
             {
-                new() { Name = "test.queue" }
+                new Queue { Name = "test.queue" }
             },
             Bindings = new List<Binding>
             {
-                new()
+                new Binding
                 {
                     SourceExchange = "test.fanout",
                     DestinationQueue = "test.queue",
@@ -124,11 +128,11 @@ public class TopologyServiceTests
             Name = "Test",
             Exchanges = new List<Exchange>
             {
-                new() { Name = "test.exchange", Type = ExchangeType.Direct }
+                new Exchange { Name = "test.exchange", Type = ExchangeType.Direct }
             },
             Queues = new List<Queue>
             {
-                new() { Name = "orphaned.queue" }
+                new Queue { Name = "orphaned.queue" }
             }
         };
 
@@ -149,11 +153,11 @@ public class TopologyServiceTests
             Name = "  Test Topology  ",
             Exchanges = new List<Exchange>
             {
-                new() { Name = "TEST.EXCHANGE  " }
+                new Exchange { Name = "TEST.EXCHANGE  " }
             },
             Queues = new List<Queue>
             {
-                new() { Name = "  TEST.QUEUE" }
+                new Queue { Name = "  TEST.QUEUE" }
             }
         };
 
@@ -164,5 +168,39 @@ public class TopologyServiceTests
         Assert.Equal("test topology", normalized.Name);
         Assert.Equal("test.exchange", normalized.Exchanges[0].Name);
         Assert.Equal("test.queue", normalized.Queues[0].Name);
+    }
+
+    [Fact]
+    public void ValidateTopology_WithInvalidBinding_ReturnsError()
+    {
+        // Arrange
+        var topology = new Topology
+        {
+            Name = "Test Topology",
+            Exchanges = new List<Exchange>
+            {
+                new Exchange { Name = "test.exchange", Type = ExchangeType.Direct }
+            },
+            Queues = new List<Queue>
+            {
+                new Queue { Name = "test.queue" }
+            },
+            Bindings = new List<Binding>
+            {
+                new Binding
+                {
+                    SourceExchange = "nonexistent.exchange",
+                    DestinationQueue = "test.queue",
+                    RoutingKey = "test.key"
+                }
+            }
+        };
+
+        // Act
+        var result = _service.ValidateTopology(topology);
+
+        // Assert
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, error => error.Contains("nonexistent.exchange"));
     }
 } 

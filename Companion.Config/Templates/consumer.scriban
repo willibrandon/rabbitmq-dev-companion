@@ -1,0 +1,122 @@
+using RabbitMQ.Client;
+using RabbitMQ.Client.Events;
+using System.Text;
+using System.Text.Json;
+
+namespace {{ options.namespace }};
+
+/// <summary>
+/// Generated RabbitMQ message consumer
+/// </summary>
+public class RabbitMqConsumer : IDisposable
+{
+    private readonly IConnection _connection;
+    private readonly IModel _channel;
+    private readonly Dictionary<string, EventingBasicConsumer> _consumers;
+
+    public RabbitMqConsumer()
+    {
+        var factory = new ConnectionFactory
+        {
+            HostName = "localhost", // Configure as needed
+            UserName = "{{ options.username }}",
+            Password = "{{ options.password }}",
+            VirtualHost = "{{ options.virtualhost }}"
+        };
+
+        _connection = factory.CreateConnection();
+        _channel = _connection.CreateModel();
+        _consumers = new Dictionary<string, EventingBasicConsumer>();
+
+        // Declare exchanges
+        {{~ for exchange in topology.exchanges ~}}
+        _channel.ExchangeDeclare(
+            exchange: "{{ exchange.name }}",
+            type: "{{ exchange.type | string.downcase }}",
+            durable: {{ exchange.durable | string.downcase }},
+            autoDelete: {{ exchange.autodelete | string.downcase }},
+            arguments: {{ exchange.arguments | object.to_json }});
+
+        {{~ end ~}}
+
+        // Declare queues
+        {{~ for queue in topology.queues ~}}
+        _channel.QueueDeclare(
+            queue: "{{ queue.name }}",
+            durable: {{ queue.durable | string.downcase }},
+            exclusive: {{ queue.exclusive | string.downcase }},
+            autoDelete: {{ queue.autodelete | string.downcase }},
+            arguments: {{ queue.arguments | object.to_json }});
+
+        {{~ end ~}}
+
+        // Create bindings
+        {{~ for binding in topology.bindings ~}}
+        _channel.QueueBind(
+            queue: "{{ binding.destinationqueue }}",
+            exchange: "{{ binding.sourceexchange }}",
+            routingKey: "{{ binding.routingkey }}",
+            arguments: {{ binding.arguments | object.to_json }});
+
+        {{~ end ~}}
+    }
+
+    {{~ for queue in topology.queues ~}}
+    /// <summary>
+    /// Starts consuming messages from the {{ queue.name }} queue
+    /// </summary>
+    public void ConsumeFrom{{ queue.name | string.pascalcase }}<T>(Action<T> messageHandler)
+    {
+        var consumer = new EventingBasicConsumer(_channel);
+        consumer.Received += (model, ea) =>
+        {
+            var body = ea.Body.ToArray();
+            var message = JsonSerializer.Deserialize<T>(Encoding.UTF8.GetString(body));
+
+            try
+            {
+                messageHandler(message);
+                _channel.BasicAck(ea.DeliveryTag, false);
+            }
+            catch (Exception)
+            {
+                _channel.BasicNack(ea.DeliveryTag, false, true);
+            }
+        };
+
+        _channel.BasicConsume(
+            queue: "{{ queue.name }}",
+            autoAck: false,
+            consumer: consumer);
+
+        _consumers["{{ queue.name }}"] = consumer;
+    }
+
+    /// <summary>
+    /// Stops consuming messages from the {{ queue.name }} queue
+    /// </summary>
+    public void StopConsuming{{ queue.name | string.pascalcase }}()
+    {
+        if (_consumers.TryGetValue("{{ queue.name }}", out var consumer))
+        {
+            _channel.BasicCancel(consumer.ConsumerTags[0]);
+            _consumers.Remove("{{ queue.name }}");
+        }
+    }
+
+    {{~ end ~}}
+
+    public void Dispose()
+    {
+        foreach (var consumer in _consumers.Values)
+        {
+            if (consumer.ConsumerTags.Any())
+            {
+                _channel.BasicCancel(consumer.ConsumerTags[0]);
+            }
+        }
+
+        _channel?.Dispose();
+        _connection?.Dispose();
+    }
+} 

@@ -8,6 +8,11 @@ namespace Companion.Core.Models;
 public class Binding
 {
     /// <summary>
+    /// Gets or sets the unique identifier for the binding
+    /// </summary>
+    public string Id { get; set; } = Guid.NewGuid().ToString();
+
+    /// <summary>
     /// Gets or sets the source exchange name
     /// </summary>
     public string SourceExchange { get; set; } = string.Empty;

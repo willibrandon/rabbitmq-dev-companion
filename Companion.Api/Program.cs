@@ -1,4 +1,6 @@
 using Companion.Core.Services;
+using Companion.Core.Repositories;
+using Companion.Infrastructure.Repositories;
 using Companion.Infrastructure.Configuration;
 using Companion.Infrastructure.RabbitMq;
 using Companion.Simulator.Hubs;
@@ -8,12 +10,18 @@ using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using RabbitMQ.Client;
 using System.Reflection;
+using Companion.Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddControllers();
+
+// Configure PostgreSQL
+builder.Services.AddDbContext<CompanionDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 // Configure RabbitMQ Management API client
 builder.Services.Configure<RabbitMqSettings>(
@@ -35,6 +43,7 @@ builder.Services.AddSingleton<ConnectionFactory>(sp =>
 
 // Register services
 builder.Services.AddScoped<ITopologyService, TopologyService>();
+builder.Services.AddScoped<ITopologyRepository, TopologyRepository>();
 builder.Services.AddScoped<IMessageFlowService, MessageFlowService>();
 builder.Services.AddScoped<IPatternAnalysisService, PatternAnalysisService>();
 
@@ -84,6 +93,13 @@ app.MapControllers();
 
 // Map SignalR hubs
 app.MapHub<SimulationHub>("/hubs/simulation");
+
+// Apply any pending migrations
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<CompanionDbContext>();
+    dbContext.Database.Migrate();
+}
 
 app.Run();
 

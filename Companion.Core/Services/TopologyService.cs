@@ -1,4 +1,5 @@
 using Companion.Core.Models;
+using Companion.Core.Repositories;
 using System.Text.RegularExpressions;
 
 namespace Companion.Core.Services;
@@ -9,6 +10,12 @@ namespace Companion.Core.Services;
 public class TopologyService : ITopologyService
 {
     private static readonly Regex ValidNameRegex = new("^[a-zA-Z0-9-_.]+$", RegexOptions.Compiled);
+    private readonly ITopologyRepository _topologyRepository;
+
+    public TopologyService(ITopologyRepository topologyRepository)
+    {
+        _topologyRepository = topologyRepository;
+    }
 
     /// <inheritdoc />
     public ValidationResult ValidateTopology(Topology topology)
@@ -222,4 +229,9 @@ public class TopologyService : ITopologyService
         RoutingKey = binding.RoutingKey?.Trim() ?? string.Empty,
         Arguments = binding.Arguments
     };
+
+    public async Task<Topology?> GetTopologyByIdAsync(string topologyId)
+    {
+        return await _topologyRepository.GetByIdAsync(topologyId);
+    }
 } 
