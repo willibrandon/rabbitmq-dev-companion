@@ -1,5 +1,6 @@
 import { Edge } from '@reactflow/core';
 import { ExchangeType } from '../../types/topology';
+import { validateBinding } from '../../utils/validationRules';
 
 interface HeaderArgument {
     key: string;
@@ -13,21 +14,42 @@ export const getEdgeStyle = (edge: Edge, sourceExchangeType?: ExchangeType) => {
         strokeWidth: 2,
     };
 
-    if (!edge.data) return baseStyle;
+    const validation = validateBinding(edge, sourceExchangeType);
+    
+    // Define colors
+    const colors = {
+        valid: '#555',
+        warning: '#ff9800',
+        error: '#f44336'
+    };
 
-    // Validate based on exchange type
-    let isValid = true;
-    if (sourceExchangeType === ExchangeType.Direct) {
-        isValid = !!edge.data.routingKey;
-    } else if (sourceExchangeType === ExchangeType.Headers) {
-        const headers = (edge.data.arguments?.headers || []) as HeaderArgument[];
-        isValid = headers.length > 0 && headers.every(h => h.key && h.value);
-    }
+    // Determine style based on validation
+    const style = {
+        ...baseStyle,
+        stroke: validation.errors.length > 0 ? colors.error : 
+               validation.warnings.length > 0 ? colors.warning : 
+               colors.valid,
+        strokeWidth: validation.errors.length > 0 ? 3 : 2,
+        strokeDasharray: validation.errors.length > 0 ? '5,5' : 
+                        validation.warnings.length > 0 ? '10,5' : 
+                        'none',
+    };
+
+    // Add tooltip content
+    const tooltipContent = [
+        ...validation.errors.map(error => `❌ ${error}`),
+        ...validation.warnings.map(warning => `⚠️ ${warning}`)
+    ].join('\n');
 
     return {
-        ...baseStyle,
-        stroke: isValid ? '#555' : '#ff0000',
-        strokeWidth: isValid ? 2 : 3,
-        strokeDasharray: isValid ? 'none' : '5,5',
+        ...style,
+        // Add data attributes for tooltip
+        data: {
+            ...edge.data,
+            tooltipContent: tooltipContent || undefined,
+            validationStatus: validation.errors.length > 0 ? 'error' : 
+                            validation.warnings.length > 0 ? 'warning' : 
+                            'valid'
+        }
     };
 }; 

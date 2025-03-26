@@ -27,6 +27,85 @@ const NODE_TYPES = {
 
 const INITIAL_VIEWPORT = { x: 0, y: 0, zoom: 1.5 };
 
+// Custom edge with tooltip
+const CustomEdge = ({
+    id,
+    sourceX,
+    sourceY,
+    targetX,
+    targetY,
+    sourcePosition,
+    targetPosition,
+    style = {},
+    data,
+    markerEnd,
+}: any) => {
+    const edgePath = `M${sourceX},${sourceY}L${targetX},${targetY}`;
+    const midX = (sourceX + targetX) / 2;
+    const midY = (sourceY + targetY) / 2;
+
+    return (
+        <>
+            {data?.tooltipContent && (
+                <Tooltip 
+                    title={<pre style={{ margin: 0 }}>{data.tooltipContent}</pre>}
+                    placement="top"
+                >
+                    <g>
+                        <path
+                            id={id}
+                            style={style}
+                            className="react-flow__edge-path"
+                            d={edgePath}
+                            markerEnd={markerEnd}
+                        />
+                        {/* Invisible wider path for better hover area */}
+                        <path
+                            style={{ 
+                                stroke: 'transparent',
+                                strokeWidth: 20,
+                                fill: 'none',
+                                cursor: 'pointer'
+                            }}
+                            d={edgePath}
+                        />
+                    </g>
+                </Tooltip>
+            )}
+            {!data?.tooltipContent && (
+                <path
+                    id={id}
+                    style={style}
+                    className="react-flow__edge-path"
+                    d={edgePath}
+                    markerEnd={markerEnd}
+                />
+            )}
+            {data?.label && (
+                <text
+                    style={{ 
+                        fill: data.validationStatus === 'error' ? '#f44336' :
+                              data.validationStatus === 'warning' ? '#ff9800' :
+                              '#555',
+                        fontSize: '12px'
+                    }}
+                    x={midX}
+                    y={midY}
+                    dy={-5}
+                    textAnchor="middle"
+                    alignmentBaseline="middle"
+                >
+                    {data.label}
+                </text>
+            )}
+        </>
+    );
+};
+
+const EDGE_TYPES = {
+    default: CustomEdge,
+};
+
 export const TopologyDesigner: React.FC = () => {
     const [nodes, setNodes, onNodesChange] = useNodesState([]);
     const [edges, setEdges, onEdgesChange] = useEdgesState([]);
@@ -57,7 +136,8 @@ export const TopologyDesigner: React.FC = () => {
     const styledEdges = useMemo(() => {
         return edges.map(edge => ({
             ...edge,
-            style: getEdgeStyle(edge, getSourceExchangeType(edge.source)),
+            type: 'default', // Use our custom edge
+            ...getEdgeStyle(edge, getSourceExchangeType(edge.source)),
         }));
     }, [edges, getSourceExchangeType]);
 
@@ -224,6 +304,7 @@ export const TopologyDesigner: React.FC = () => {
                     onNodeDoubleClick={handleNodeDoubleClick}
                     onEdgeDoubleClick={handleEdgeDoubleClick}
                     nodeTypes={NODE_TYPES}
+                    edgeTypes={EDGE_TYPES}
                     defaultViewport={INITIAL_VIEWPORT}
                     minZoom={0.1}
                     maxZoom={4}
