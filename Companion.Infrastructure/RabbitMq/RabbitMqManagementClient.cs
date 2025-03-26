@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using System.Web;
 using Companion.Core.Models;
 using Companion.Infrastructure.Configuration;
 using Companion.Infrastructure.RabbitMq.Models;
@@ -16,6 +17,7 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
     private readonly HttpClient _httpClient;
     private readonly RabbitMqSettings _settings;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly string _encodedVhost;
 
     /// <summary>
     /// Initializes a new instance of the RabbitMqManagementClient class
@@ -26,7 +28,7 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
         _settings.Validate();
 
         _httpClient = httpClient;
-        _httpClient.BaseAddress = new Uri(_settings.BaseUrl);
+        _httpClient.BaseAddress = new Uri(_settings.BaseUrl.TrimEnd('/') + "/");
         _httpClient.Timeout = TimeSpan.FromSeconds(_settings.TimeoutSeconds);
 
         var authString = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{_settings.UserName}:{_settings.Password}"));
@@ -36,6 +38,8 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
         {
             PropertyNameCaseInsensitive = true
         };
+
+        _encodedVhost = HttpUtility.UrlEncode(_settings.VirtualHost);
     }
 
     /// <inheritdoc />
@@ -60,7 +64,7 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
     /// <inheritdoc />
     public async Task<IReadOnlyList<Exchange>> GetExchangesAsync(CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"/api/exchanges/{_settings.VirtualHost}", cancellationToken);
+        var response = await _httpClient.GetAsync($"exchanges/{_encodedVhost}", cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -83,7 +87,7 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
     /// <inheritdoc />
     public async Task<IReadOnlyList<Queue>> GetQueuesAsync(CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"/api/queues/{_settings.VirtualHost}", cancellationToken);
+        var response = await _httpClient.GetAsync($"queues/{_encodedVhost}", cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -109,7 +113,7 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
     /// <inheritdoc />
     public async Task<IReadOnlyList<Binding>> GetBindingsAsync(CancellationToken cancellationToken = default)
     {
-        var response = await _httpClient.GetAsync($"/api/bindings/{_settings.VirtualHost}", cancellationToken);
+        var response = await _httpClient.GetAsync($"bindings/{_encodedVhost}", cancellationToken);
         response.EnsureSuccessStatusCode();
 
         var content = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -134,7 +138,7 @@ public class RabbitMqManagementClient : IRabbitMqManagementClient
     {
         try
         {
-            var response = await _httpClient.GetAsync("/api/health/checks/alarms", cancellationToken);
+            var response = await _httpClient.GetAsync("health/checks/alarms", cancellationToken);
             return response.IsSuccessStatusCode;
         }
         catch
