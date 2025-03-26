@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography } from '@mui/material';
 
-const DebugAnalysis: React.FC = () => {
+export const DebugAnalysis: React.FC = () => {
     return (
         <Box>
             <Typography variant="h4" gutterBottom>
@@ -12,6 +12,4 @@ const DebugAnalysis: React.FC = () => {
             </Typography>
         </Box>
     );
-};
-
-export default DebugAnalysis; 
+}; 

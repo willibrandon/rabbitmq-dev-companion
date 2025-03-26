@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { Topology } from '../types/topology';
+import { Topology, ValidationResult } from '../types/topology';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5052/api';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
@@ -10,19 +10,19 @@ const api = axios.create({
     },
 });
 
-export interface ValidationResult {
-    isValid: boolean;
-    errors: string[];
-}
-
 export const topologyApi = {
     getFromBroker: async (): Promise<Topology> => {
         const response = await api.get<Topology>('/topologies/from-broker');
         return response.data;
     },
 
-    validateTopology: async (topology: Topology): Promise<ValidationResult> => {
+    validate: async (topology: Topology): Promise<ValidationResult> => {
         const response = await api.post<ValidationResult>('/designer/validate', topology);
+        return response.data;
+    },
+
+    normalize: async (topology: Topology): Promise<Topology> => {
+        const response = await api.post<Topology>('/designer/normalize', topology);
         return response.data;
     },
 
