@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import { ReactFlow, Node, Edge, Connection, useNodesState, useEdgesState, addEdge } from '@reactflow/core';
 import { Background } from '@reactflow/background';
 import { Controls } from '@reactflow/controls';
@@ -10,6 +10,7 @@ import { QueueNode } from '../components/topology/QueueNode';
 import { AddNodeDialog } from '../components/topology/AddNodeDialog';
 import { EditNodeDialog } from '../components/topology/EditNodeDialog';
 import { EditEdgeDialog } from '../components/topology/EditEdgeDialog';
+import { getEdgeStyle } from '../components/topology/EdgeStyles';
 import { topologyApi } from '../services/api';
 import { NodeType, Topology, Exchange, Queue, Binding, ExchangeType } from '../types/topology';
 
@@ -46,20 +47,34 @@ export const TopologyDesigner: React.FC = () => {
         isOpen: false
     });
 
+    // Get source exchange type for an edge
+    const getSourceExchangeType = useCallback((sourceId: string): ExchangeType | undefined => {
+        const sourceNode = nodes.find(n => n.id === sourceId);
+        return sourceNode?.data?.type as ExchangeType;
+    }, [nodes]);
+
+    // Style edges based on validation
+    const styledEdges = useMemo(() => {
+        return edges.map(edge => ({
+            ...edge,
+            style: getEdgeStyle(edge, getSourceExchangeType(edge.source)),
+        }));
+    }, [edges, getSourceExchangeType]);
+
     const onConnect = useCallback(
         (params: Connection) => {
-            // Find the source node (exchange) to get its type
-            const sourceNode = nodes.find(n => n.id === params.source);
-            const sourceExchangeType = sourceNode?.data?.type as ExchangeType;
-
+            const sourceExchangeType = getSourceExchangeType(params.source!);
+            
             // Create a new edge with default binding data
             const edge = {
                 ...params,
                 id: `e${params.source}-${params.target}`,
                 data: {
                     routingKey: sourceExchangeType === ExchangeType.Direct ? 'route-key' : '',
+                    arguments: sourceExchangeType === ExchangeType.Headers ? { headers: [] } : undefined,
                 },
                 label: sourceExchangeType === ExchangeType.Direct ? 'route-key' : '',
+                style: getEdgeStyle({ ...params, data: {} } as Edge, sourceExchangeType),
             };
 
             setEdges((eds) => addEdge(edge, eds));
@@ -71,7 +86,7 @@ export const TopologyDesigner: React.FC = () => {
                 isOpen: true
             });
         },
-        [nodes, setEdges]
+        [getSourceExchangeType, setEdges]
     );
 
     const handleAddNode = useCallback((type: NodeType, data: Partial<Exchange | Queue>) => {
@@ -165,16 +180,13 @@ export const TopologyDesigner: React.FC = () => {
     }, [editNode.node, setNodes]);
 
     const handleEdgeDoubleClick = useCallback((event: React.MouseEvent, edge: Edge) => {
-        // Find the source node (exchange) to get its type
-        const sourceNode = nodes.find(n => n.id === edge.source);
-        const sourceExchangeType = sourceNode?.data?.type as ExchangeType;
-
+        const sourceExchangeType = getSourceExchangeType(edge.source);
         setEditEdge({ 
             edge, 
             sourceExchangeType,
             isOpen: true 
         });
-    }, [nodes]);
+    }, [getSourceExchangeType]);
 
     const handleUpdateEdge = useCallback((edge: Edge, data: Partial<Binding>) => {
         setEdges((eds) =>
@@ -205,7 +217,7 @@ export const TopologyDesigner: React.FC = () => {
             >
                 <ReactFlow
                     nodes={nodes}
-                    edges={edges}
+                    edges={styledEdges}
                     onNodesChange={onNodesChange}
                     onEdgesChange={onEdgesChange}
                     onConnect={onConnect}

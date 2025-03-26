@@ -9,9 +9,23 @@ import {
     Box,
     Typography,
     Alert,
+    IconButton,
+    Paper,
+    Select,
+    MenuItem,
+    FormControl,
+    InputLabel,
+    SelectChangeEvent,
 } from '@mui/material';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import { Edge } from '@reactflow/core';
 import { Binding, ExchangeType } from '../../types/topology';
+
+interface HeaderArgument {
+    key: string;
+    value: string;
+    matchType: 'all' | 'any' | 'exact';
+}
 
 interface EditEdgeDialogProps {
     open: boolean;
@@ -30,12 +44,17 @@ export const EditEdgeDialog: React.FC<EditEdgeDialogProps> = ({
 }) => {
     const [formData, setFormData] = useState<Partial<Binding>>({});
     const [validationError, setValidationError] = useState<string | null>(null);
+    const [headerArgs, setHeaderArgs] = useState<HeaderArgument[]>([]);
 
     useEffect(() => {
         if (edge?.data) {
             setFormData(edge.data as Partial<Binding>);
+            setHeaderArgs(
+                ((edge.data as Partial<Binding>).arguments?.headers as HeaderArgument[]) || []
+            );
         } else {
             setFormData({});
+            setHeaderArgs([]);
         }
         setValidationError(null);
     }, [edge]);
@@ -62,6 +81,19 @@ export const EditEdgeDialog: React.FC<EditEdgeDialogProps> = ({
         }
     };
 
+    const validateHeaders = (): boolean => {
+        if (sourceExchangeType !== ExchangeType.Headers) return true;
+        if (headerArgs.length === 0) {
+            setValidationError('Headers exchange requires at least one header argument');
+            return false;
+        }
+        if (headerArgs.some(h => !h.key || !h.value)) {
+            setValidationError('All header arguments must have both key and value');
+            return false;
+        }
+        return true;
+    };
+
     const handleChange = (field: string) => (event: React.ChangeEvent<HTMLInputElement>) => {
         const value = event.target.value;
         setFormData((prev) => ({ ...prev, [field]: value }));
@@ -75,9 +107,47 @@ export const EditEdgeDialog: React.FC<EditEdgeDialogProps> = ({
         }
     };
 
+    const handleAddHeader = () => {
+        setHeaderArgs([...headerArgs, { key: '', value: '', matchType: 'all' }]);
+    };
+
+    const handleRemoveHeader = (index: number) => {
+        setHeaderArgs(headerArgs.filter((_, i) => i !== index));
+    };
+
+    const handleHeaderTextChange = (index: number, field: 'key' | 'value') => (
+        event: React.ChangeEvent<HTMLInputElement>
+    ) => {
+        const newHeaders = [...headerArgs];
+        newHeaders[index] = {
+            ...newHeaders[index],
+            [field]: event.target.value,
+        };
+        setHeaderArgs(newHeaders);
+    };
+
+    const handleHeaderMatchTypeChange = (index: number) => (
+        event: SelectChangeEvent
+    ) => {
+        const newHeaders = [...headerArgs];
+        newHeaders[index] = {
+            ...newHeaders[index],
+            matchType: event.target.value as 'all' | 'any' | 'exact',
+        };
+        setHeaderArgs(newHeaders);
+    };
+
     const handleSave = () => {
-        if (edge && !validationError) {
-            onSave(edge, formData);
+        if (edge && !validationError && validateHeaders()) {
+            const data = {
+                ...formData,
+                arguments: {
+                    ...formData.arguments,
+                    headers: headerArgs,
+                    'x-match': headerArgs.some(h => h.matchType === 'any') ? 'any' : 'all',
+                },
+            };
+            onSave(edge, data);
             onClose();
         }
     };
@@ -116,20 +186,68 @@ export const EditEdgeDialog: React.FC<EditEdgeDialogProps> = ({
                         onChange={handleChange('routingKey')}
                         helperText={getRoutingKeyHelperText()}
                         error={!!validationError}
-                        disabled={sourceExchangeType === ExchangeType.Fanout}
+                        disabled={sourceExchangeType === ExchangeType.Fanout || sourceExchangeType === ExchangeType.Headers}
                         fullWidth
                     />
+
+                    {sourceExchangeType === ExchangeType.Headers && (
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography variant="subtitle2">Header Arguments</Typography>
+                                <IconButton 
+                                    size="small" 
+                                    onClick={handleAddHeader}
+                                    color="primary"
+                                >
+                                    <AddIcon />
+                                </IconButton>
+                            </Box>
+                            
+                            {headerArgs.map((header, index) => (
+                                <Paper key={index} sx={{ p: 2 }} variant="outlined">
+                                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                                        <TextField
+                                            label="Key"
+                                            value={header.key}
+                                            onChange={handleHeaderTextChange(index, 'key')}
+                                            size="small"
+                                            fullWidth
+                                        />
+                                        <TextField
+                                            label="Value"
+                                            value={header.value}
+                                            onChange={handleHeaderTextChange(index, 'value')}
+                                            size="small"
+                                            fullWidth
+                                        />
+                                        <FormControl size="small" sx={{ minWidth: 120 }}>
+                                            <InputLabel>Match</InputLabel>
+                                            <Select
+                                                value={header.matchType}
+                                                onChange={handleHeaderMatchTypeChange(index)}
+                                                label="Match"
+                                            >
+                                                <MenuItem value="all">All</MenuItem>
+                                                <MenuItem value="any">Any</MenuItem>
+                                                <MenuItem value="exact">Exact</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                        <IconButton
+                                            size="small"
+                                            onClick={() => handleRemoveHeader(index)}
+                                            color="error"
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </Box>
+                                </Paper>
+                            ))}
+                        </Box>
+                    )}
 
                     {validationError && (
                         <Alert severity="error">
                             {validationError}
-                        </Alert>
-                    )}
-
-                    {/* TODO: Add header arguments editor for Headers exchange type */}
-                    {sourceExchangeType === ExchangeType.Headers && (
-                        <Alert severity="info">
-                            Header arguments editor coming soon
                         </Alert>
                     )}
                 </Box>
