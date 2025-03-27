@@ -1,4 +1,5 @@
 using Companion.Core.Models;
+using Companion.Core.Models.Auth;
 using Microsoft.EntityFrameworkCore;
 
 namespace Companion.Infrastructure.Data;
@@ -14,6 +15,7 @@ public class CompanionDbContext : DbContext
     public DbSet<Exchange> Exchanges { get; set; } = null!;
     public DbSet<Queue> Queues { get; set; } = null!;
     public DbSet<Binding> Bindings { get; set; } = null!;
+    public DbSet<User> Users { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -91,6 +93,13 @@ public class CompanionDbContext : DbContext
             entity.Property(e => e.RoutingKey).HasColumnName("routing_key");
             entity.Property(e => e.Arguments).HasColumnName("arguments")
                 .HasColumnType("jsonb");
+        });
+
+        // Configure User entity
+        modelBuilder.Entity<User>(entity =>
+        {
+            entity.HasIndex(e => e.Username).IsUnique();
+            entity.HasIndex(e => e.Email).IsUnique();
         });
     }
 } 

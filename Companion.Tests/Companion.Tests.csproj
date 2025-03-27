@@ -22,6 +22,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Companion.Core\Companion.Core.csproj" />
     <ProjectReference Include="..\Companion.Patterns\Companion.Patterns.csproj" />
+    <ProjectReference Include="..\Companion.Api\Companion.Api.csproj" />
   </ItemGroup>
 
 </Project>

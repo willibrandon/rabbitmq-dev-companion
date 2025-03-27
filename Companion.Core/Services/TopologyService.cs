@@ -18,14 +18,14 @@ public class TopologyService : ITopologyService
     }
 
     /// <inheritdoc />
-    public ValidationResult ValidateTopology(Topology topology)
+    public async Task<bool> ValidateTopology(Topology topology)
     {
         var errors = new List<string>();
         var warnings = new List<string>();
 
         if (topology == null)
         {
-            return ValidationResult.Failed("Topology cannot be null");
+            return false;
         }
 
         // Validate basic topology properties
@@ -55,15 +55,11 @@ public class TopologyService : ITopologyService
         // Check for orphaned components
         ValidateOrphanedComponents(topology, warnings);
 
-        return errors.Any() 
-            ? ValidationResult.Failed(errors.ToArray()) 
-            : warnings.Any() 
-                ? ValidationResult.SuccessWithWarnings(warnings.ToArray()) 
-                : ValidationResult.Success();
+        return !errors.Any();
     }
 
     /// <inheritdoc />
-    public Topology NormalizeTopology(Topology topology)
+    public async Task<Topology> NormalizeTopology(Topology topology)
     {
         if (topology == null)
         {
@@ -233,5 +229,26 @@ public class TopologyService : ITopologyService
     public async Task<Topology?> GetTopologyByIdAsync(string topologyId)
     {
         return await _topologyRepository.GetByIdAsync(topologyId);
+    }
+
+    public async Task<Topology> GetFromBrokerAsync()
+    {
+        throw new NotImplementedException("This method should be implemented in the Infrastructure layer");
+    }
+
+    public async Task<Topology> SaveTopologyAsync(Topology topology)
+    {
+        if (!await ValidateTopology(topology))
+        {
+            throw new InvalidOperationException("Topology validation failed");
+        }
+
+        topology = await NormalizeTopology(topology);
+        return await _topologyRepository.CreateOrUpdateAsync(topology);
+    }
+
+    public async Task<bool> CheckBrokerHealthAsync()
+    {
+        throw new NotImplementedException("This method should be implemented in the Infrastructure layer");
     }
 } 

@@ -17,7 +17,7 @@ public class TopologyServiceTests
     }
 
     [Fact]
-    public void ValidateTopology_WithValidTopology_ReturnsSuccess()
+    public async Task ValidateTopology_WithValidTopology_ReturnsTrue()
     {
         // Arrange
         var topology = new Topology
@@ -43,29 +43,27 @@ public class TopologyServiceTests
         };
 
         // Act
-        var result = _service.ValidateTopology(topology);
+        var result = await _service.ValidateTopology(topology);
 
         // Assert
-        Assert.True(result.IsValid);
-        Assert.Empty(result.Errors);
+        Assert.True(result);
     }
 
     [Fact]
-    public void ValidateTopology_WithMissingName_ReturnsError()
+    public async Task ValidateTopology_WithMissingName_ReturnsFalse()
     {
         // Arrange
         var topology = new Topology();
 
         // Act
-        var result = _service.ValidateTopology(topology);
+        var result = await _service.ValidateTopology(topology);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("name is required"));
+        Assert.False(result);
     }
 
     [Fact]
-    public void ValidateTopology_WithInvalidExchangeName_ReturnsError()
+    public async Task ValidateTopology_WithInvalidExchangeName_ReturnsFalse()
     {
         // Arrange
         var topology = new Topology
@@ -78,15 +76,14 @@ public class TopologyServiceTests
         };
 
         // Act
-        var result = _service.ValidateTopology(topology);
+        var result = await _service.ValidateTopology(topology);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("invalid characters"));
+        Assert.False(result);
     }
 
     [Fact]
-    public void ValidateTopology_WithFanoutExchangeAndRoutingKey_ReturnsError()
+    public async Task ValidateTopology_WithFanoutExchangeAndRoutingKey_ReturnsFalse()
     {
         // Arrange
         var topology = new Topology
@@ -112,15 +109,14 @@ public class TopologyServiceTests
         };
 
         // Act
-        var result = _service.ValidateTopology(topology);
+        var result = await _service.ValidateTopology(topology);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("should not have a routing key"));
+        Assert.False(result);
     }
 
     [Fact]
-    public void ValidateTopology_WithOrphanedQueue_ReturnsWarning()
+    public async Task ValidateTopology_WithOrphanedQueue_ReturnsTrue()
     {
         // Arrange
         var topology = new Topology
@@ -137,15 +133,14 @@ public class TopologyServiceTests
         };
 
         // Act
-        var result = _service.ValidateTopology(topology);
+        var result = await _service.ValidateTopology(topology);
 
         // Assert
-        Assert.True(result.IsValid);
-        Assert.Contains(result.Warnings, w => w.Contains("has no bindings"));
+        Assert.True(result);
     }
 
     [Fact]
-    public void NormalizeTopology_NormalizesNames()
+    public async Task NormalizeTopology_NormalizesNames()
     {
         // Arrange
         var topology = new Topology
@@ -162,7 +157,7 @@ public class TopologyServiceTests
         };
 
         // Act
-        var normalized = _service.NormalizeTopology(topology);
+        var normalized = await _service.NormalizeTopology(topology);
 
         // Assert
         Assert.Equal("test topology", normalized.Name);
@@ -171,7 +166,7 @@ public class TopologyServiceTests
     }
 
     [Fact]
-    public void ValidateTopology_WithInvalidBinding_ReturnsError()
+    public async Task ValidateTopology_WithInvalidBinding_ReturnsFalse()
     {
         // Arrange
         var topology = new Topology
@@ -197,10 +192,79 @@ public class TopologyServiceTests
         };
 
         // Act
-        var result = _service.ValidateTopology(topology);
+        var result = await _service.ValidateTopology(topology);
 
         // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, error => error.Contains("nonexistent.exchange"));
+        Assert.False(result);
+    }
+
+    [Fact]
+    public async Task SaveTopologyAsync_WithValidTopology_SavesAndReturnsTopology()
+    {
+        // Arrange
+        var topology = new Topology
+        {
+            Name = "Test Topology",
+            Exchanges = new List<Exchange>
+            {
+                new Exchange { Name = "test.exchange", Type = ExchangeType.Direct }
+            }
+        };
+
+        _mockRepository.Setup(r => r.CreateOrUpdateAsync(It.IsAny<Topology>()))
+            .ReturnsAsync((Topology t) => t);
+
+        // Act
+        var result = await _service.SaveTopologyAsync(topology);
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("test topology", result.Name);
+        _mockRepository.Verify(r => r.CreateOrUpdateAsync(It.IsAny<Topology>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveTopologyAsync_WithInvalidTopology_ThrowsException()
+    {
+        // Arrange
+        var topology = new Topology(); // Invalid topology with no name
+
+        // Act & Assert
+        await Assert.ThrowsAsync<InvalidOperationException>(() => 
+            _service.SaveTopologyAsync(topology));
+        
+        _mockRepository.Verify(r => r.CreateOrUpdateAsync(It.IsAny<Topology>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetTopologyByIdAsync_ReturnsTopology()
+    {
+        // Arrange
+        var expectedTopology = new Topology { Name = "Test" };
+        _mockRepository.Setup(r => r.GetByIdAsync("test-id"))
+            .ReturnsAsync(expectedTopology);
+
+        // Act
+        var result = await _service.GetTopologyByIdAsync("test-id");
+
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal(expectedTopology.Name, result.Name);
+    }
+
+    [Fact]
+    public async Task GetFromBrokerAsync_ThrowsNotImplementedException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<NotImplementedException>(() => 
+            _service.GetFromBrokerAsync());
+    }
+
+    [Fact]
+    public async Task CheckBrokerHealthAsync_ThrowsNotImplementedException()
+    {
+        // Act & Assert
+        await Assert.ThrowsAsync<NotImplementedException>(() => 
+            _service.CheckBrokerHealthAsync());
     }
 } 

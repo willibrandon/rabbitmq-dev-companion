@@ -7,73 +7,76 @@ namespace Companion.Infrastructure.Repositories;
 
 public class TopologyRepository : ITopologyRepository
 {
-    private readonly CompanionDbContext _dbContext;
+    private readonly CompanionDbContext _context;
 
-    public TopologyRepository(CompanionDbContext dbContext)
+    public TopologyRepository(CompanionDbContext context)
     {
-        _dbContext = dbContext;
+        _context = context;
     }
 
-    public async Task<Topology?> GetByIdAsync(string id)
+    public async Task<Topology?> GetByIdAsync(string topologyId)
     {
-        return await _dbContext.Topologies
+        return await _context.Topologies
             .Include(t => t.Exchanges)
             .Include(t => t.Queues)
             .Include(t => t.Bindings)
-            .FirstOrDefaultAsync(t => t.Id == id);
+            .FirstOrDefaultAsync(t => t.Id == topologyId);
+    }
+
+    public async Task<Topology> CreateOrUpdateAsync(Topology topology)
+    {
+        var existing = await _context.Topologies
+            .Include(t => t.Exchanges)
+            .Include(t => t.Queues)
+            .Include(t => t.Bindings)
+            .FirstOrDefaultAsync(t => t.Id == topology.Id);
+
+        if (existing == null)
+        {
+            // Create new topology
+            topology.CreatedAt = DateTime.UtcNow;
+            topology.UpdatedAt = DateTime.UtcNow;
+            _context.Topologies.Add(topology);
+        }
+        else
+        {
+            // Update existing topology
+            existing.Name = topology.Name;
+            existing.Description = topology.Description;
+            existing.UpdatedAt = DateTime.UtcNow;
+
+            // Update collections
+            _context.Exchanges.RemoveRange(existing.Exchanges);
+            _context.Queues.RemoveRange(existing.Queues);
+            _context.Bindings.RemoveRange(existing.Bindings);
+
+            existing.Exchanges = topology.Exchanges;
+            existing.Queues = topology.Queues;
+            existing.Bindings = topology.Bindings;
+
+            topology = existing;
+        }
+
+        await _context.SaveChangesAsync();
+        return topology;
+    }
+
+    public async Task<bool> DeleteAsync(string topologyId)
+    {
+        var topology = await _context.Topologies.FindAsync(topologyId);
+        if (topology == null) return false;
+
+        _context.Topologies.Remove(topology);
+        await _context.SaveChangesAsync();
+        return true;
     }
 
     public async Task<IEnumerable<Topology>> GetAllAsync()
     {
-        return await _dbContext.Topologies
+        return await _context.Topologies
             .Include(t => t.Exchanges)
             .Include(t => t.Queues)
             .Include(t => t.Bindings)
             .ToListAsync();
-    }
-
-    public async Task<Topology> CreateAsync(Topology topology)
-    {
-        _dbContext.Topologies.Add(topology);
-        await _dbContext.SaveChangesAsync();
-        return topology;
-    }
-
-    public async Task<Topology> UpdateAsync(string id, Topology topology)
-    {
-        var existingTopology = await GetByIdAsync(id) 
-            ?? throw new KeyNotFoundException($"Topology with ID {id} not found");
-
-        // Update properties
-        existingTopology.Name = topology.Name;
-        existingTopology.Description = topology.Description;
-
-        // Update exchanges
-        _dbContext.Exchanges.RemoveRange(existingTopology.Exchanges);
-        existingTopology.Exchanges = topology.Exchanges;
-
-        // Update queues
-        _dbContext.Queues.RemoveRange(existingTopology.Queues);
-        existingTopology.Queues = topology.Queues;
-
-        // Update bindings
-        _dbContext.Bindings.RemoveRange(existingTopology.Bindings);
-        existingTopology.Bindings = topology.Bindings;
-
-        await _dbContext.SaveChangesAsync();
-        return existingTopology;
-    }
-
-    public async Task<bool> DeleteAsync(string id)
-    {
-        var topology = await _dbContext.Topologies.FindAsync(id);
-        if (topology == null)
-        {
-            return false;
-        }
-
-        _dbContext.Topologies.Remove(topology);
-        await _dbContext.SaveChangesAsync();
-        return true;
     }
 } 
