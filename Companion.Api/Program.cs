@@ -195,6 +195,8 @@ using (var scope = app.Services.CreateScope())
     else
     {
         dbContext.Database.Migrate();
+        // Seed initial data in development
+        await DbSeeder.SeedDataAsync(dbContext);
     }
 }
 

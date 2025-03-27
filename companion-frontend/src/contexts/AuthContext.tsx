@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { authService, User } from '../services/auth';
+import { authService, User, LoginResponse } from '../services/auth';
 
 interface AuthContextType {
     user: User | null;
@@ -23,10 +23,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     if (currentUser) {
                         setUser(currentUser);
                         setIsAuthenticated(true);
+                    } else {
+                        // If getCurrentUser returns null, clean up auth state
+                        setUser(null);
+                        setIsAuthenticated(false);
+                        authService.logout();
                     }
                 } catch {
                     setUser(null);
                     setIsAuthenticated(false);
+                    authService.logout();
                 }
             }
         };
@@ -35,10 +41,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, []);
 
     const login = async (username: string, password: string) => {
-        await authService.login(username, password);
-        const user = await authService.getCurrentUser();
-        setUser(user);
-        setIsAuthenticated(true);
+        const response = await authService.login(username, password);
+        // After successful login, get the user details
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser) {
+            setUser(currentUser);
+            setIsAuthenticated(true);
+        } else {
+            // If we can't get user details, clean up
+            setUser(null);
+            setIsAuthenticated(false);
+            authService.logout();
+            throw new Error('Failed to get user details');
+        }
     };
 
     const logout = () => {

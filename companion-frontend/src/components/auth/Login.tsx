@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { 
     Box, 
     Paper, 
@@ -9,7 +9,7 @@ import {
     Alert,
     Container
 } from '@mui/material';
-import { authService } from '../../services/auth';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const Login: React.FC = () => {
     const [username, setUsername] = useState('');
@@ -17,6 +17,8 @@ export const Login: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
+    const { login } = useAuth();
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -24,9 +26,12 @@ export const Login: React.FC = () => {
         setIsLoading(true);
 
         try {
-            await authService.login(username, password);
-            navigate('/'); // Redirect to home page after successful login
+            await login(username, password);
+            // Get the return URL from location state, or default to home
+            const from = (location.state as any)?.from?.pathname || '/';
+            navigate(from);
         } catch (err) {
+            console.error('Login error:', err);
             setError('Invalid username or password');
         } finally {
             setIsLoading(false);

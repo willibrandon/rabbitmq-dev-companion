@@ -9,6 +9,8 @@ export interface LoginRequest {
 
 export interface LoginResponse {
     token: string;
+    username: string;
+    role: string;
     expiresAt: string;
 }
 
@@ -17,6 +19,8 @@ export interface User {
     username: string;
     email: string;
     role: string;
+    createdAt: string;
+    lastLoginAt: string | null;
 }
 
 class AuthService {

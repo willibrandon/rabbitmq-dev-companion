@@ -2,6 +2,7 @@ using Companion.Core.Models.Auth;
 using Companion.Core.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 
 namespace Companion.Api.Controllers;
 
@@ -55,5 +56,28 @@ public class AuthController : ControllerBase
     public IActionResult Validate()
     {
         return Ok(new { message = "Token is valid" });
+    }
+
+    [Authorize]
+    [HttpGet("me")]
+    [ProducesResponseType(typeof(UserInfo), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<UserInfo>> GetCurrentUser()
+    {
+        var username = User.Identity?.Name;
+        if (username == null)
+        {
+            return Unauthorized();
+        }
+
+        var users = await _authService.GetUsersAsync();
+        var currentUser = users.FirstOrDefault(u => u.Username == username);
+        
+        if (currentUser == null)
+        {
+            return Unauthorized();
+        }
+
+        return Ok(currentUser);
     }
 } 
