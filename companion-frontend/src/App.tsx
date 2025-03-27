@@ -6,6 +6,9 @@ import TopologyDesigner from './pages/TopologyDesigner';
 import { Simulations } from './pages/Simulations';
 import { DebugAnalysis } from './pages/DebugAnalysis';
 import { LearningModules } from './pages/LearningModules';
+import { Login } from './components/auth/Login';
+import { PrivateRoute } from './components/auth/PrivateRoute';
+import { AuthProvider } from './contexts/AuthContext';
 
 const theme = createTheme({
   palette: {
@@ -24,16 +27,47 @@ const theme = createTheme({
 const App: React.FC = () => {
   return (
     <ThemeProvider theme={theme}>
-      <Router>
-        <Layout>
-          <Routes>
-            <Route path="/" element={<TopologyDesigner />} />
-            <Route path="/simulations" element={<Simulations />} />
-            <Route path="/debug" element={<DebugAnalysis />} />
-            <Route path="/learning" element={<LearningModules />} />
-          </Routes>
-        </Layout>
-      </Router>
+      <AuthProvider>
+        <Router>
+          <Layout>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route 
+                path="/" 
+                element={
+                  <PrivateRoute>
+                    <TopologyDesigner />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/simulations" 
+                element={
+                  <PrivateRoute>
+                    <Simulations />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/debug" 
+                element={
+                  <PrivateRoute>
+                    <DebugAnalysis />
+                  </PrivateRoute>
+                } 
+              />
+              <Route 
+                path="/learning" 
+                element={
+                  <PrivateRoute>
+                    <LearningModules />
+                  </PrivateRoute>
+                } 
+              />
+            </Routes>
+          </Layout>
+        </Router>
+      </AuthProvider>
     </ThemeProvider>
   );
 };

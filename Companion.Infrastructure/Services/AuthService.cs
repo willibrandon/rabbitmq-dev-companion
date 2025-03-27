@@ -98,6 +98,20 @@ public class AuthService : IAuthService
         }
     }
 
+    public async Task<IEnumerable<UserInfo>> GetUsersAsync()
+    {
+        var users = await _context.Users.ToListAsync();
+        return users.Select(u => new UserInfo
+        {
+            Id = u.Id,
+            Username = u.Username,
+            Email = u.Email,
+            Role = u.Role,
+            CreatedAt = u.CreatedAt,
+            LastLoginAt = u.LastLoginAt
+        });
+    }
+
     private string GenerateJwtToken(User user)
     {
         var tokenHandler = new JwtSecurityTokenHandler();

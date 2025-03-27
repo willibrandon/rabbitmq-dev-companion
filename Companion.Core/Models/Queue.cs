@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Companion.Core.Models;
 
@@ -35,6 +36,7 @@ public class Queue
     /// <summary>
     /// Gets or sets optional arguments for the queue
     /// </summary>
+    [NotMapped]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object>? Arguments { get; set; }
 

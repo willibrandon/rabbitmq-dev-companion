@@ -1,6 +1,8 @@
 using Companion.Core.Models;
 using Companion.Core.Models.Auth;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using System.Text.Json;
 
 namespace Companion.Infrastructure.Data;
 
@@ -24,6 +26,12 @@ public class CompanionDbContext : DbContext
         // Use a collation compatible with the template database
         // modelBuilder.UseCollation("und-x-icu");
 
+        // Create a value converter for Dictionary<string, object>
+        var dictionaryConverter = new ValueConverter<Dictionary<string, object>, string>(
+            v => JsonSerializer.Serialize(v, new JsonSerializerOptions { WriteIndented = false }),
+            v => JsonSerializer.Deserialize<Dictionary<string, object>>(v, new JsonSerializerOptions { WriteIndented = false }) ?? new Dictionary<string, object>()
+        );
+
         modelBuilder.Entity<Topology>(entity =>
         {
             entity.ToTable("topologies");
@@ -33,8 +41,9 @@ public class CompanionDbContext : DbContext
             entity.Property(e => e.Description).HasColumnName("description");
             entity.Property(e => e.CreatedAt).HasColumnName("created_at");
             entity.Property(e => e.UpdatedAt).HasColumnName("updated_at");
-            entity.Property(e => e.Metadata).HasColumnName("metadata")
-                .HasColumnType("jsonb");
+            entity.Property(e => e.Metadata)
+                .HasColumnName("metadata")
+                .HasConversion(dictionaryConverter);
             
             entity.HasMany(e => e.Exchanges)
                 .WithOne()
@@ -62,8 +71,9 @@ public class CompanionDbContext : DbContext
             entity.Property(e => e.Durable).HasColumnName("durable");
             entity.Property(e => e.AutoDelete).HasColumnName("auto_delete");
             entity.Property(e => e.Internal).HasColumnName("internal");
-            entity.Property(e => e.Arguments).HasColumnName("arguments")
-                .HasColumnType("jsonb");
+            entity.Property(e => e.Arguments)
+                .HasColumnName("arguments")
+                .HasConversion(dictionaryConverter);
         });
 
         modelBuilder.Entity<Queue>(entity =>
@@ -75,8 +85,9 @@ public class CompanionDbContext : DbContext
             entity.Property(e => e.Durable).HasColumnName("durable");
             entity.Property(e => e.AutoDelete).HasColumnName("auto_delete");
             entity.Property(e => e.Exclusive).HasColumnName("exclusive");
-            entity.Property(e => e.Arguments).HasColumnName("arguments")
-                .HasColumnType("jsonb");
+            entity.Property(e => e.Arguments)
+                .HasColumnName("arguments")
+                .HasConversion(dictionaryConverter);
             entity.Property(e => e.MaxLength).HasColumnName("max_length");
             entity.Property(e => e.MessageTtl).HasColumnName("message_ttl");
             entity.Property(e => e.DeadLetterExchange).HasColumnName("dead_letter_exchange");
@@ -91,8 +102,9 @@ public class CompanionDbContext : DbContext
             entity.Property(e => e.SourceExchange).HasColumnName("source_exchange").IsRequired();
             entity.Property(e => e.DestinationQueue).HasColumnName("destination_queue").IsRequired();
             entity.Property(e => e.RoutingKey).HasColumnName("routing_key");
-            entity.Property(e => e.Arguments).HasColumnName("arguments")
-                .HasColumnType("jsonb");
+            entity.Property(e => e.Arguments)
+                .HasColumnName("arguments")
+                .HasConversion(dictionaryConverter);
         });
 
         // Configure User entity

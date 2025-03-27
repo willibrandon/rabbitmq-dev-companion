@@ -231,6 +231,11 @@ public class TopologyService : ITopologyService
         return await _topologyRepository.GetByIdAsync(topologyId);
     }
 
+    public async Task<IEnumerable<Topology>> GetTopologiesAsync()
+    {
+        return await _topologyRepository.GetAllAsync();
+    }
+
     public async Task<Topology> GetFromBrokerAsync()
     {
         throw new NotImplementedException("This method should be implemented in the Infrastructure layer");

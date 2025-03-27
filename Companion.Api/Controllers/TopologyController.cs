@@ -9,7 +9,7 @@ namespace Companion.Api.Controllers;
 /// API endpoints for managing RabbitMQ topologies
 /// </summary>
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/topologies")]
 [Authorize] // Require authentication for all endpoints
 public class TopologyController : ControllerBase
 {
@@ -21,6 +21,19 @@ public class TopologyController : ControllerBase
     public TopologyController(ITopologyService topologyService)
     {
         _topologyService = topologyService;
+    }
+
+    /// <summary>
+    /// Gets all saved topologies
+    /// </summary>
+    /// <returns>List of saved topologies</returns>
+    [HttpGet]
+    [ProducesResponseType(typeof(IEnumerable<Topology>), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<ActionResult<IEnumerable<Topology>>> GetTopologies()
+    {
+        var topologies = await _topologyService.GetTopologiesAsync();
+        return Ok(topologies);
     }
 
     /// <summary>

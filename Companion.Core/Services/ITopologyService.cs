@@ -28,6 +28,12 @@ public interface ITopologyService
     /// <returns>The topology if found, null otherwise</returns>
     Task<Topology?> GetTopologyByIdAsync(string topologyId);
 
+    /// <summary>
+    /// Gets all saved topologies
+    /// </summary>
+    /// <returns>List of all saved topologies</returns>
+    Task<IEnumerable<Topology>> GetTopologiesAsync();
+
     Task<Topology> GetFromBrokerAsync();
     Task<Topology> SaveTopologyAsync(Topology topology);
     Task<bool> CheckBrokerHealthAsync();

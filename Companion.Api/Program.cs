@@ -188,7 +188,14 @@ app.MapHub<SimulationHub>("/hubs/simulation");
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<CompanionDbContext>();
-    dbContext.Database.Migrate();
+    if (app.Environment.IsEnvironment("Testing"))
+    {
+        dbContext.Database.EnsureCreated();
+    }
+    else
+    {
+        dbContext.Database.Migrate();
+    }
 }
 
 app.Run();
@@ -197,3 +204,5 @@ record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
 {
     public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
 }
+
+public partial class Program { } // Make Program class public for testing
